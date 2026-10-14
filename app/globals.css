@@ -1,0 +1,11 @@
+:root{--bd:#d9dde3;--fg:#1a1a1a;--mut:#667;--pri:#1d4ed8;--bad:#b91c1c;--ok:#15803d}
+*{box-sizing:border-box} body{margin:0;font-family:system-ui,'Sarabun','Leelawadee UI',sans-serif;color:var(--fg);background:#f6f7f9}
+main{max-width:960px;margin:0 auto;padding:24px 16px} h1{font-size:22px;margin:0 0 16px} h2{font-size:17px;margin:24px 0 8px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:14px} th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd)}
+a{color:var(--pri)} nav{display:flex;gap:16px;margin-bottom:16px;font-size:14px}
+button,.btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block}
+button.sec{background:#fff;color:var(--fg);border:1px solid var(--bd)} button:disabled{opacity:.5;cursor:default}
+input{padding:8px;border:1px solid var(--bd);border-radius:8px;font-size:14px;width:100%} label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} .err{color:var(--bad)} .ok{color:var(--ok)} .mut{color:var(--mut);font-size:13px}
+.badge{font-size:12px;padding:2px 8px;border-radius:99px;background:#eef;color:#335} pre{white-space:pre-wrap;font-size:13px}
