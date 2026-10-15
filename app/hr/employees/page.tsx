@@ -8,12 +8,13 @@ export default function Employees() {
     setLog(j.ok ? `นำเข้า ${j.imported} คน` + (j.rejected.length ? `\nไม่ผ่าน:\n${j.rejected.join('\n')}` : '') : j.error); setBusy(false);
   }
   async function invite() {
-    setBusy(true); let total = 0, fails: string[] = [];
+    setBusy(true); let invited = 0, linked = 0; const failed: { id: string; msg: string }[] = [];
     for (;;) {
-      const j = await (await fetch('/api/hr/employees/invite', { method: 'POST' })).json();
+      const j = await (await fetch('/api/hr/employees/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skip: failed.map(f => f.id) }) })).json();
       if (!j.ok) { setLog(j.error); break; }
-      total += j.invited; fails.push(...j.failed); setLog(`ส่งคำเชิญแล้ว ${total} คน • เหลือ ${j.remaining}`);
-      if (!j.remaining || (j.invited === 0)) { setLog(l => l + (fails.length ? `\nล้มเหลว:\n${fails.join('\n')}` : '')); break; }
+      invited += j.invited; linked += j.linked; failed.push(...j.failed);
+      setLog(`เชิญใหม่ ${invited} คน • ผูกบัญชีที่มีอยู่แล้ว ${linked} คน • เหลือ ${j.remaining}` + (failed.length ? `\nล้มเหลว ${failed.length} คน:\n${failed.map(f => f.msg).join('\n')}` : ''));
+      if (!j.remaining || (j.invited + j.linked === 0 && j.failed.length === 0)) break;
     }
     setBusy(false);
   }
