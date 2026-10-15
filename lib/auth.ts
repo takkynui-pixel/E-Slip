@@ -8,7 +8,8 @@ export async function currentUser() {
   return data.user;
 }
 export async function rolesOf(userId: string): Promise<string[]> {
-  const { data } = await admin().from('user_roles').select('role').eq('user_id', userId);
+  const { data, error } = await admin().from('user_roles').select('role').eq('user_id', userId);
+  if (error) throw new Error('อ่านบทบาทไม่ได้: ' + error.message);   // ไม่เงียบ — เช่น service role key ผิด
   return (data ?? []).map((r: any) => r.role);
 }
 /** ใช้ใน API route: คืน user ถ้าเป็น hr/admin ไม่เช่นนั้นคืน null */

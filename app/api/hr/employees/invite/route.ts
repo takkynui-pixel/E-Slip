@@ -1,22 +1,13 @@
 import { NextResponse } from 'next/server';
 import { admin } from '@/lib/supabase/admin';
 import { requireHr, audit } from '@/lib/auth';
+import { sendMessages, inviteMsg, resetMsg, authLink } from '@/lib/email';
 
 export const maxDuration = 60;
 
-async function findAuthUser(db: any, email: string) {
-  for (let page = 1; page <= 10; page++) {                       // สูงสุด 10,000 บัญชี
-    const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error || !data?.users?.length) return null;
-    const u = data.users.find((x: any) => x.email?.toLowerCase() === email.toLowerCase());
-    if (u) return u;
-    if (data.users.length < 1000) return null;
-  }
-  return null;
-}
-
-// เชิญพนักงานที่มีอีเมลแต่ยังไม่ผูกบัญชี ทีละ 20 คน (ไคลเอนต์เรียกวนจนไม่มีความคืบหน้า)
-// body: { skip: string[] } = รหัส employees ที่ล้มเหลวไปแล้วในรอบนี้ (กันวนซ้ำคนเดิม)
+// เชิญพนักงานที่มีอีเมลแต่ยังไม่ผูกบัญชี ทีละ 20 คน — สร้างลิงก์เองด้วย generateLink (ไม่ส่งเมลผ่าน Supabase)
+// แล้วส่งผ่าน Resend API; ผูก employees.user_id หลังส่งสำเร็จเท่านั้น (ส่งไม่ผ่านก็ลองใหม่ได้)
+// body: { skip: string[] } = รหัสที่ล้มเหลวไปแล้วในรอบนี้ (กันวนซ้ำคนเดิม)
 export async function POST(req: Request) {
   const user = await requireHr(); if (!user) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { skip = [] } = await req.json().catch(() => ({}));
@@ -24,34 +15,46 @@ export async function POST(req: Request) {
   let q: any = db.from('employees').select('id, email').is('user_id', null).not('email', 'is', null).eq('active', true).limit(20);
   if (skip.length) q = q.not('id', 'in', `(${skip.join(',')})`);
   const { data: todo } = await q;
-  const redirectTo = `${process.env.APP_URL}/set-password`;
-  const failed: { id: string; msg: string }[] = []; let invited = 0, linked = 0;
+
+  const failed: { id: string; msg: string }[] = [];
+  const toSend: { id: string; userId: string; msg: any; isNew: boolean }[] = [];
+  let linkedOnly = 0;
 
   for (const e of todo ?? []) {
-    const r = await db.auth.admin.inviteUserByEmail(e.email!, { redirectTo });
-    if (!r.error && r.data.user) {
-      const up = await db.from('employees').update({ user_id: r.data.user.id }).eq('id', e.id);
-      if (up.error) failed.push({ id: e.id, msg: `${e.email}: ผูกบัญชีไม่สำเร็จ ${up.error.message}` }); else invited++;
+    let isNew = true;
+    let g: any = await db.auth.admin.generateLink({ type: 'invite', email: e.email! });     // สร้างบัญชีใหม่ (ยังไม่ยืนยัน)
+    if (g.error && /already|registered|exists/i.test(g.error.message)) {                    // บัญชีมีอยู่แล้ว
+      isNew = false;
+      g = await db.auth.admin.generateLink({ type: 'recovery', email: e.email! });
+    }
+    if (g.error || !g.data?.user || !g.data?.properties?.hashed_token) { failed.push({ id: e.id, msg: `${e.email}: ${g.error?.message ?? 'สร้างลิงก์ไม่สำเร็จ'}` }); continue; }
+    const au = g.data.user;
+    if (!isNew && au.last_sign_in_at) {                                                     // เคยเข้าระบบแล้ว: ผูกอย่างเดียว ไม่ส่งเมล
+      const up = await db.from('employees').update({ user_id: au.id }).eq('id', e.id);
+      if (up.error) failed.push({ id: e.id, msg: `${e.email}: ${up.error.message}` }); else linkedOnly++;
       continue;
     }
-    // บัญชีมีอยู่แล้ว (เช่น เชิญไปรอบก่อนแต่ส่งเมลไม่สำเร็จ / เคยล็อกอินแล้ว) -> ผูกเข้ากับพนักงาน
-    if (r.error && /already|registered|exists/i.test(r.error.message)) {
-      const au = await findAuthUser(db, e.email!);
-      if (au) {
-        const up = await db.from('employees').update({ user_id: au.id }).eq('id', e.id);
-        if (up.error) { failed.push({ id: e.id, msg: `${e.email}: ${up.error.message}` }); continue; }
-        linked++;
-        if (!au.last_sign_in_at) {                               // ยังไม่เคยเข้าระบบ -> ส่งลิงก์ตั้งรหัสผ่านใหม่
-          const rs = await db.auth.resetPasswordForEmail(e.email!, { redirectTo });
-          if (rs.error) failed.push({ id: e.id, msg: `${e.email}: ผูกบัญชีแล้วแต่ส่งลิงก์ไม่สำเร็จ (${rs.error.message})` });
-        }
-        continue;
-      }
-    }
-    failed.push({ id: e.id, msg: `${e.email}: ${r.error?.message ?? 'unknown'}` });
+    const link = authLink(g.data.properties.hashed_token, isNew ? 'invite' : 'recovery');
+    toSend.push({ id: e.id, userId: au.id, isNew, msg: isNew ? inviteMsg(e.email!, link) : resetMsg(e.email!, link) });
   }
+
+  let invited = 0, linked = linkedOnly;
+  if (toSend.length) {
+    try {
+      await sendMessages(toSend.map(t => t.msg));
+      for (const t of toSend) {
+        const up = await db.from('employees').update({ user_id: t.userId }).eq('id', t.id);
+        if (up.error) failed.push({ id: t.id, msg: `ส่งเมลแล้วแต่ผูกบัญชีไม่สำเร็จ: ${up.error.message}` });
+        else if (t.isNew) invited++; else linked++;
+      }
+      await new Promise(r => setTimeout(r, 600));                                           // เผื่อเพดานอัตราคำขอของ Resend
+    } catch (err: any) {
+      for (const t of toSend) failed.push({ id: t.id, msg: String(err.message).slice(0, 300) });
+    }
+  }
+
   let rq: any = db.from('employees').select('id', { count: 'exact', head: true }).is('user_id', null).not('email', 'is', null).eq('active', true);
-  if (skip.length || failed.length) rq = rq.not('id', 'in', `(${[...skip, ...failed.map(f => f.id)].join(',')})`);
+  const ex = [...skip, ...failed.map(f => f.id)]; if (ex.length) rq = rq.not('id', 'in', `(${ex.join(',')})`);
   const { count } = await rq;
   await audit(user.id, 'invite_employees', undefined, { invited, linked, failed: failed.length });
   return NextResponse.json({ ok: true, invited, linked, failed, remaining: count ?? 0 });

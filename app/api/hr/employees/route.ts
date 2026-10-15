@@ -17,8 +17,13 @@ export async function POST(req: Request) {
     const code = String(r['รหัสพนักงาน'] ?? '').trim(); if (!code) continue;
     const email = String(r['อีเมล'] ?? '').trim().toLowerCase();
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { bad.push(`${code}: อีเมลไม่ถูกต้อง`); continue; }
-    out.push({ emp_code: code, full_name: String(r['ชื่อ'] ?? '').trim(), email: email || null,
-      bank_name: String(r['ธนาคาร'] ?? '').trim() || null, bank_account_masked: mask(String(r['เลขบัญชี'] ?? '')) || null });
+    // ช่องที่ว่างในไฟล์ = ไม่แตะค่าเดิมในฐานข้อมูล (กันนำเข้าไฟล์ที่กรอกไม่ครบแล้วลบอีเมล/บัญชีที่มีอยู่)
+    const row: any = { emp_code: code };
+    const name = String(r['ชื่อ'] ?? '').trim(); if (name) row.full_name = name;
+    if (email) row.email = email;
+    const bank = String(r['ธนาคาร'] ?? '').trim(); if (bank) row.bank_name = bank;
+    const acc = mask(String(r['เลขบัญชี'] ?? '')); if (acc) row.bank_account_masked = acc;
+    out.push(row);
   }
   if (out.length) {
     const { error } = await admin().from('employees').upsert(out, { onConflict: 'emp_code' });

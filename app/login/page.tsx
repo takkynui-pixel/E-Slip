@@ -10,8 +10,8 @@ export default function Login() {
   }
   async function reset() {
     if (!email) return setMsg('กรอกอีเมลก่อน');
-    await supabaseBrowser().auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/set-password` });
-    setMsg('หากอีเมลนี้มีในระบบ จะได้รับลิงก์ตั้งรหัสผ่านใหม่');
+    await fetch('/api/auth/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    setMsg('หากอีเมลนี้มีในระบบ จะได้รับลิงก์ตั้งรหัสผ่านใหม่ (ลองขอซ้ำได้หลัง 1 นาที)');
   }
   return <main style={{ maxWidth: 380 }}><div className="card"><h1>เข้าสู่ระบบสลิปเงินเดือน</h1>
     <label>อีเมล</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" />
