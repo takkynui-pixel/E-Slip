@@ -32,7 +32,7 @@ export default function SetPassword() {
     const { error } = await supabaseBrowser().auth.updateUser({ password: pw });
     if (error) { setMsg(error.message); setBusy(false); } else window.location.href = '/';
   }
-  return <main style={{ maxWidth: 380 }}><div className="card"><h1>ตั้งรหัสผ่าน</h1>
+  return <div className="auth"><div className="auth-box"><div className="auth-logo"><img src="/logo.png" alt="VTA Service" /></div><div className="card"><h1>ตั้งรหัสผ่าน</h1>
     {step === 'loading' && <p className="mut">กำลังตรวจสอบ…</p>}
     {step === 'bad' && <p className="err">ลิงก์หมดอายุหรือถูกใช้ไปแล้ว กรุณากด "ลืมรหัสผ่าน" ที่<a href="/login">หน้าเข้าสู่ระบบ</a>เพื่อขอลิงก์ใหม่</p>}
     {step === 'confirm' && <><p className="mut">กดปุ่มด้านล่างเพื่อยืนยันลิงก์และตั้งรหัสผ่าน</p><button disabled={busy} onClick={confirm}>ดำเนินการต่อ</button></>}
@@ -40,5 +40,5 @@ export default function SetPassword() {
       <label>รหัสผ่านใหม่ (อย่างน้อย 10 ตัว)</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" />
       <label>ยืนยันรหัสผ่าน</label><input type="password" value={pw2} onChange={e => setPw2(e.target.value)} autoComplete="new-password" />
       <div style={{ marginTop: 14 }}><button disabled={busy} onClick={save}>บันทึก</button></div></>}
-    {msg && <p className="err">{msg}</p>}</div></main>;
+    {msg && <p className="err">{msg}</p>}</div></div></div>;
 }

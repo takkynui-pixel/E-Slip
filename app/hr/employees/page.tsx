@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import PageHead from '@/components/PageHead';
 export default function Employees() {
   const [file, setFile] = useState<File | null>(null); const [log, setLog] = useState(''); const [busy, setBusy] = useState(false);
   async function upload() {
@@ -18,11 +19,14 @@ export default function Employees() {
     }
     setBusy(false);
   }
-  return <main><nav><a href="/hr">← กลับ</a></nav>
-    <div className="card"><h1>รายชื่อพนักงาน</h1>
-      <p className="mut">ไฟล์ .xlsx/.csv หัวคอลัมน์: รหัสพนักงาน | ชื่อ | อีเมล | ธนาคาร | เลขบัญชี (ระบบเก็บเฉพาะเลขบัญชีที่ปิดบังแล้ว)</p>
+  return <>
+    <PageHead title="พนักงาน" subtitle="นำเข้ารายชื่อและอีเมล แล้วส่งคำเชิญให้พนักงานตั้งรหัสผ่าน" />
+    <div className="card">
+      <h2>นำเข้ารายชื่อพนักงาน</h2>
+      <p className="mut">ไฟล์ .xlsx/.csv หัวคอลัมน์: รหัสพนักงาน | ชื่อ | อีเมล | ธนาคาร | เลขบัญชี (ระบบเก็บเฉพาะเลขบัญชีที่ปิดบังแล้ว • ช่องที่เว้นว่างจะไม่ทับค่าเดิม)</p>
       <input type="file" accept=".xlsx,.csv" onChange={e => setFile(e.target.files?.[0] ?? null)} />
-      <div className="row" style={{ marginTop: 12 }}><button disabled={!file || busy} onClick={upload}>นำเข้า</button>
+      <div className="row" style={{ marginTop: 14 }}><button disabled={!file || busy} onClick={upload}>นำเข้า</button>
         <button className="sec" disabled={busy} onClick={invite}>ส่งคำเชิญตั้งรหัสผ่านให้พนักงานที่ยังไม่มีบัญชี</button></div>
-      <pre>{log}</pre></div></main>;
+      <pre>{log}</pre></div>
+  </>;
 }
